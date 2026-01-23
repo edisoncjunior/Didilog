@@ -1,4 +1,4 @@
-﻿# MEXC-TXZERO Didi funcionando (local e web) = 
+﻿# MEXC-TXZERO log web - Didi funcionando (local e web) = 
 # coloquei pra rodar local 23h55 sábado 17/01 e funcionou
 # coloquei pra rodar web dia 18/01 as 23h38 
 
@@ -344,14 +344,14 @@ SHUTDOWN = False
 def handle_sigint(sig, frame):
     global SHUTDOWN
     SHUTDOWN = True
-    send_telegram(f"🤖 Scanner (MEXC-TXZERO log) interrompido pelo usuário em {now_sp_str()}.")
+    send_telegram(f"🤖 Scanner (MEXC-TXZERO log web) interrompido pelo usuário em {now_sp_str()}.")
     LOGGER.info("Interrupção solicitada. Encerrando...")
 
 signal.signal(signal.SIGINT, handle_sigint)
 signal.signal(signal.SIGTERM, handle_sigint)
 
 def main_loop():
-    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log) iniciado em {now_sp_str()} — Binance Futures (15m).")
+    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log web) iniciado em {now_sp_str()} — Binance Futures (15m).")
     LOGGER.info("Iniciado scanner com lista fixa de símbolos.")
 
     while not SHUTDOWN:
@@ -404,7 +404,7 @@ def build_alert_message(res):
     # Compose TPs text
     tps_text = "\n".join([f"TP{i+1}: {tp:.8f}" for i,tp in enumerate(tps)])
     msg = (
-        f"🚨 <b>ALERTA 15min (MEXC-TXZERO log)</b>\n"
+        f"🚨 <b>ALERTA 15min (MEXC-TXZERO log web)</b>\n"
         f"Exchange: Binance Futures\n"
         f"Par: <b>{sym}</b>\n"
         f"Horário SP: {now}\n"
@@ -440,7 +440,7 @@ def send_daily_summary():
     symbols = ", ".join(sorted(df["symbol"].unique()))
 
     msg = (
-        f"📊 <b>RESUMO DIÁRIO – MEXC-TXZERO log</b>\n"
+        f"📊 <b>RESUMO DIÁRIO – MEXC-TXZERO log web</b>\n"
         f"Dia operacional: {operational_date}\n\n"
         f"Total de sinais: <b>{total}</b>\n"
         f"LONG: {longs}\n"
