@@ -1,8 +1,8 @@
-﻿# MEXC-TXZERO log web - Didi funcionando (local e web) = 
-# coloquei pra rodar local 23h55 sábado 17/01 e funcionou
-# coloquei pra rodar web dia 18/01 as 23h38 
+﻿# MEXC-TXZERO log+web - Didi funcionando (local e web) = 
+# coloquei pra rodar local 22h sexta 23/01 e funcionou
+# coloquei pra rodar web 22h dia 23/01  (aguardando resultado) 
 
-#proximos testes = 1) colocar log para enviar as 9 e 21h
+#proximos testes = 1) colocar log para enviar as 9 e 21h # testando!
 # antes de fazer os testes -> desligar a versão web ou mudar o grupo?
 
 #!/usr/bin/env python3
@@ -139,9 +139,6 @@ SCHEDULER.add_job(
     id="log_noite",
     replace_existing=True
 )
-
-SCHEDULER.start()
-
 
 # --- Utilities
 
@@ -350,9 +347,20 @@ def handle_sigint(sig, frame):
 signal.signal(signal.SIGINT, handle_sigint)
 signal.signal(signal.SIGTERM, handle_sigint)
 
+def send_telegram_or_fail(text):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"}
+    r = requests.post(url, data=payload, timeout=10)
+    r.raise_for_status()
+
 def main_loop():
+    send_telegram_or_fail("🤖 Scanner iniciado com sucesso (Railway).")
     send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log web) iniciado em {now_sp_str()} — Binance Futures (15m).")
-    LOGGER.info("Iniciado scanner com lista fixa de símbolos.")
+    LOGGER.info("Iniciado scanner com lista fixa de símbolos.(log+")
+    LOGGER.info("Bot ativo - heartbeat")
+
+    SCHEDULER.start()
+    LOGGER.info("Scheduler iniciado.")
 
     while not SHUTDOWN:
         try:
