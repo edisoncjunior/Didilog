@@ -428,7 +428,7 @@ def send_daily_summary():
     log_file = get_daily_log_filename(operational_date)
 
     if not os.path.isfile(log_file):
-        send_telegram("📊 Resumo diário:\nNenhum sinal registrado no período.")
+        send_telegram("📊 Resumo diário:\nNenhum sinal registrado no período. (log web)")
         return
 
     df = pd.read_csv(log_file, sep="\t")
