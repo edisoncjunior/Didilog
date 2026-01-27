@@ -1,8 +1,9 @@
-﻿# Didilog
-# MEXC-TXZERO (web) - Didi funcionando (local e web) = 
-# coloquei pra rodar local 10h50 terça 27/01 e funcionou
-# coloquei pra rodar web 10h55 dia 27/01 commit BA+TX0 (aguardando resultado) 
+﻿# MEXC-TXZERO log+web - Didi funcionando (local e web) = 
+# coloquei pra rodar local 22h sexta 23/01 e funcionou
+# coloquei pra rodar web 22h dia 23/01  (aguardando resultado) 
 
+#proximos testes = 1) colocar log para enviar as 9 e 21h # testando!
+# antes de fazer os testes -> desligar a versão web ou mudar o grupo?
 
 #!/usr/bin/env python3
 """
@@ -42,8 +43,6 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 POLL_SECONDS = int(os.getenv("POLL_SECONDS") or 60)
 KLINES_LIMIT = int(os.getenv("KLINES_LIMIT") or 200)
 
-STARTUP_GRACE_SECONDS = 30
-STARTED_AT = time.time()
 
 BOLLINGER_PERIOD = 8
 BOLLINGER_STD = 2
@@ -53,20 +52,33 @@ BOLLINGER_WIDTH_MIN_PCT = float(os.getenv("BOLLINGER_WIDTH_MIN_PCT") or 0.015)  
 ADX_MIN = float(os.getenv("ADX_MIN") or 15)
 ADX_ACCEL_THRESHOLD = float(os.getenv("ADX_ACCEL_THRESHOLD") or 0.05)  # relative accel
 
-
-IS_RAILWAY = bool(os.getenv("RAILWAY_ENVIRONMENT"))
-LOG_FILE = os.getenv("LOG_FILE", "scanner_runtime.log")
-
 BINANCE_FAPI = "https://fapi.binance.com"   # futures api (perpetual)
 
 # ==========================
-# LISTA FIXA DE ATIVOS # LISTA DO BRUNO AGUIAR - conferida com lista do EDER
+# LISTA FIXA DE ATIVOS
 # ==========================
 FIXED_SYMBOLS = [
-#Lista dos ativos do Bruno Aguiar na MEXC com taxa zero:
-    "BCHUSDT", "BNBUSDT", "CHZUSDT", "DOGEUSDT", "ENAUSDT", "ETHUSDT",
-    "JASMYUSDT", "SOLUSDT", "UNIUSDT", "XMRUSDT", "XRPUSDT"
+#    "APEUSDT", "1INCHUSDT", 
+    "ADAUSDT", "ALGOUSDT"
+#    "ALICEUSDT", "ANKRUSDT", "ARBUSDT", "ATAUSDT", "BANDUSDT", "BCHUSDT",
+#    "BELUSDT", "BNBUSDT", "BTCUSDT", "CELOUSDT", "CHZUSDT", "CYBERUSDT", "DASHUSDT", 
+#    "DOTUSDT", "DYDXUSDT", "EGLDUSDT", "ENJUSDT", "ENSUSDT", "ETCUSDT", "ETHUSDT", "FETUSDT", "FILUSDT",
+#    "GMTUSDT", "GRTUSDT", "GTCUSDT", "HOTUSDT",
+    "HBARUSDT", "ICPUSDT", 
+#     "ICXUSDT", "IMXUSDT", "JASMYUSDT", "JTOUSDT",
+#    "JUPUSDT", "KAVAUSDT", "KNCUSDT", "LINKUSDT", "LPTUSDT", "LQTYUSDT", "LTCUSDT", "MASKUSDT", "MTLUSDT",
+    "NEARUSDT", "OPUSDT"
+#    "NEOUSDT", "OGNUSDT", "ONEUSDT", "OPUSDT", "PEOPLEUSDT", "RLCUSDT", "RSRUSDT", "RUNEUSDT",
+#    "SANDUSDT", "SFPUSDT", "SKLUSDT", "SNXUSDT", "SOLUSDT",
+#    "STORJUSDT", 
+    "SUIUSDT", 
+#    "SUSHIUSDT", "SXPUSDT", "THETAUSDT", "TIAUSDT", "TONUSDT", "TRBUSDT", "TRXUSDT",
+#    "UNIUSDT", "VETUSDT", "WOOUSDT", "XLMUSDT", "XMRUSDT",
+    "XRPUSDT", 
+#    "XTZUSDT", "ZENUSDT", "ZILUSDT", "ZRXUSDT"
 ]
+
+LOG_FILE = os.getenv("LOG_FILE", "scanner_runtime.log")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -102,9 +114,9 @@ def get_operational_date(now=None):
 def enviar_log_diario():
     try:
         send_daily_summary()
-        LOGGER.info("Resumo diário enviado com sucesso (web).")
+        LOGGER.info("Resumo diário enviado com sucesso (scheduler).")
     except Exception:
-        LOGGER.exception("Erro ao enviar resumo diário (web).")
+        LOGGER.exception("Erro ao enviar resumo diário (scheduler).")
 
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -113,7 +125,6 @@ from apscheduler.triggers.cron import CronTrigger
 tz = pytz.timezone("America/Sao_Paulo")
 
 SCHEDULER = BackgroundScheduler(timezone=tz)
-SCHEDULER.daemonic = False
 
 SCHEDULER.add_job(
     enviar_log_diario,
@@ -143,7 +154,7 @@ def send_telegram(text):
         r = requests.post(url, data=payload, timeout=10)
         r.raise_for_status()
     except Exception as e:
-        LOGGER.exception("Erro (web) enviando Telegram: %s", e)
+        LOGGER.exception("Erro enviando Telegram: %s", e)
 
 def fetch_klines(symbol, interval="15m", limit=KLINES_LIMIT):
     url = BINANCE_FAPI + "/fapi/v1/klines"
@@ -291,7 +302,7 @@ def analyze_symbol(symbol):
         df = fetch_klines(symbol, interval="15m", limit=KLINES_LIMIT)
         df = df.iloc[:-1] # remove candles ainda abertos
     except Exception as e:
-        LOGGER.debug("Erro (web) ao buscar klines %s: %s", symbol, e)
+        LOGGER.debug("Erro ao buscar klines %s: %s", symbol, e)
         return None
 
     if df is None or df.empty:
@@ -329,31 +340,64 @@ def analyze_symbol(symbol):
 SHUTDOWN = False
 def handle_sigint(sig, frame):
     global SHUTDOWN
-    uptime = time.time() - STARTED_AT
-
-    # Proteção contra shutdown precoce do Railway
-    if uptime < STARTUP_GRACE_SECONDS:
-        LOGGER.warning(
-            "SIGTERM ignorado durante grace period (uptime=%.1fs)",
-            uptime
-        )
-        return
     SHUTDOWN = True
-    send_telegram(f"🤖 Scanner (MEXC-TXZERO log web) interrompido pelo sistema (SIGTERM) em {now_sp_str()}.")
-    LOGGER.info("Interrupção (web) real detectada. Encerrando scanner...")
+    send_telegram(f"🤖 Scanner (MEXC-TXZERO log web) interrompido pelo usuário em {now_sp_str()}.")
+    LOGGER.info("Interrupção solicitada. Encerrando...")
 
 signal.signal(signal.SIGINT, handle_sigint)
 signal.signal(signal.SIGTERM, handle_sigint)
-
-def keep_alive_guard():
-    while True:
-        time.sleep(60)
 
 def send_telegram_or_fail(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"}
     r = requests.post(url, data=payload, timeout=10)
     r.raise_for_status()
+
+def main_loop():
+    send_telegram_or_fail("🤖 Scanner iniciado com sucesso (Railway).")
+    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log web) iniciado em {now_sp_str()} — Binance Futures (15m).")
+    LOGGER.info("Iniciado scanner com lista fixa de símbolos.(log+")
+    LOGGER.info("Bot ativo - heartbeat")
+
+    SCHEDULER.start()
+    LOGGER.info("Scheduler iniciado.")
+
+    while not SHUTDOWN:
+        try:
+            symbols = FIXED_SYMBOLS
+            LOGGER.info("Verificando %d símbolos fixos: %s", len(symbols), ", ".join(symbols))
+            LOGGER.info("Novo ciclo iniciado (%s símbolos)", len(FIXED_SYMBOLS))
+            alerts = []
+            for sym in symbols:
+                try:
+                    res = analyze_symbol(sym)
+                    if res:
+                        alerts.append(res)
+                        msg = build_alert_message(res)
+
+                        # 1️⃣ tenta gravar log (NUNCA pode quebrar o fluxo)
+                        try:
+                            log_signal_to_file(res)
+                        except Exception as e:
+                            LOGGER.exception("Falha ao registrar log (ignorado): %s", e)
+
+                        # 2️⃣ envia Telegram SEMPRE
+                        send_telegram(msg)
+                        LOGGER.info(msg)
+                        LOGGER.info("Alerta enviado: %s %s @ %.8f", res["symbol"], res["side"], res["price"])
+                except Exception as e:
+                    LOGGER.debug("Erro analisando %s: %s", sym, e)
+            if not alerts:
+                LOGGER.info("Nenhum sinal encontrado neste ciclo.")
+        except Exception as e:
+            LOGGER.exception("Erro no loop principal: %s", e)
+        # sleep
+        for _ in range(int(max(1, POLL_SECONDS))):
+            if SHUTDOWN:
+                break
+            time.sleep(1)
+    LOGGER.info("Scanner finalizado.")
+    LOGGER.info("Ciclo finalizado")
 
 def build_alert_message(res):
     sym = res["symbol"]
@@ -404,7 +448,7 @@ def send_daily_summary():
     symbols = ", ".join(sorted(df["symbol"].unique()))
 
     msg = (
-        f"📊 <b>RESUMO DIÁRIO – MEXC-TXZERO (log web)</b>\n"
+        f"📊 <b>RESUMO DIÁRIO – MEXC-TXZERO log web</b>\n"
         f"Dia operacional: {operational_date}\n\n"
         f"Total de sinais: <b>{total}</b>\n"
         f"LONG: {longs}\n"
@@ -413,7 +457,7 @@ def send_daily_summary():
     )
 
     send_telegram(msg)
-    LOGGER.info("Resumo diário (web) enviado.")
+    LOGGER.info("Resumo diário enviado.")
 
 def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
     tz = pytz.timezone("America/Sao_Paulo")
@@ -451,72 +495,9 @@ def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
             if not file_exists:
                 f.write(header)
             f.write(row)
-            LOGGER.info("Log (web) gravado com sucesso: %s", log_file)
+            LOGGER.info("Log gravado com sucesso: %s", log_file)
     except Exception as e:
-        LOGGER.exception("Erro (web) ao gravar log em arquivo (%s): %s", log_file, e)
-
-
-def main_loop():
-    if not SCHEDULER.running:
-        SCHEDULER.start()
-        LOGGER.info("Scheduler (web) iniciado.")
-
-    if IS_RAILWAY:
-        LOGGER.info("Ambiente Railway detectado – proteções ativadas.")
-
-    send_telegram_or_fail("🤖 Scanner iniciado com sucesso (web).")
-    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log web) iniciado em {now_sp_str()} — Binance Futures (15m).")
-    LOGGER.info("Iniciado scanner (log web) com lista fixa de símbolos.")
-    LOGGER.info("Bot ativo (log web) - heartbeat")
-
-    while not SHUTDOWN:
-        LOGGER.info(
-            "Heartbeat ativo | uptime=%.1fs | memória OK",
-            time.time() - STARTED_AT
-        )
-        sys.stdout.flush()
-
-        try:
-            symbols = FIXED_SYMBOLS
-            LOGGER.info("Verificando (web) %d símbolos fixos: %s", len(symbols), ", ".join(symbols))
-            LOGGER.info("Novo ciclo (web) iniciado (%s símbolos)", len(FIXED_SYMBOLS))
-            alerts = []
-            for sym in symbols:
-                try:
-                    res = analyze_symbol(sym)
-                    if res:
-                        alerts.append(res)
-                        msg = build_alert_message(res)
-
-                        # 1️⃣ tenta gravar log (NUNCA pode quebrar o fluxo)
-                        try:
-                            log_signal_to_file(res)
-                        except Exception as e:
-                            LOGGER.exception("Falha (web) ao registrar log (ignorado): %s", e)
-
-                        # 2️⃣ envia Telegram SEMPRE
-                        send_telegram(msg)
-                        LOGGER.info(msg)
-                        LOGGER.info("Alerta (web) enviado: %s %s @ %.8f", res["symbol"], res["side"], res["price"])
-                except Exception as e:
-                    LOGGER.debug("Erro (web) analisando %s: %s", sym, e)
-            if not alerts:
-                LOGGER.info("Nenhum sinal encontrado neste ciclo (web).")
-        except Exception as e:
-            LOGGER.exception("Erro (web) no loop principal: %s", e)
-        # sleep
-        for _ in range(int(max(1, POLL_SECONDS))):
-            if SHUTDOWN:
-                break
-            time.sleep(1)
-    LOGGER.info("Scanner (web) finalizado.")
-    LOGGER.info("Ciclo (web) finalizado")
-
-    threading.Thread(
-        target=keep_alive_guard,
-        daemon=False
-    ).start()
-
+        LOGGER.exception("Erro ao gravar log em arquivo (%s): %s", log_file, e)
 
 
 
