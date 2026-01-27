@@ -1,6 +1,6 @@
 ﻿# MEXC-TXZERO (web) - Didi funcionando (local e web) = 
-# coloquei pra rodar local 8h27 sexta 24/01 e funcionou
-# coloquei pra rodar web 16h10 dia 24/01  (aguardando resultado) 
+# coloquei pra rodar local 10h50 terça 27/01 e funcionou
+# coloquei pra rodar web 10h55 dia 27/01 commit BA+TX0 (aguardando resultado) 
 
 #proximos testes = 1) colocar log para enviar as 9 e 21h # testando!
 # antes de fazer os testes -> desligar a versão web ou mudar o grupo?
@@ -55,27 +55,38 @@ ADX_ACCEL_THRESHOLD = float(os.getenv("ADX_ACCEL_THRESHOLD") or 0.05)  # relativ
 BINANCE_FAPI = "https://fapi.binance.com"   # futures api (perpetual)
 
 # ==========================
-# LISTA FIXA DE ATIVOS
+# LISTA FIXA DE ATIVOS # LISTA DO BRUNO AGUIAR - conferida com lista do EDER
 # ==========================
 FIXED_SYMBOLS = [
-#    "APEUSDT", "1INCHUSDT", 
-    "ADAUSDT", "ALGOUSDT"
-#    "ALICEUSDT", "ANKRUSDT", "ARBUSDT", "ATAUSDT", "BANDUSDT", "BCHUSDT",
-#    "BELUSDT", "BNBUSDT", "BTCUSDT", "CELOUSDT", "CHZUSDT", "CYBERUSDT", "DASHUSDT", 
-#    "DOTUSDT", "DYDXUSDT", "EGLDUSDT", "ENJUSDT", "ENSUSDT", "ETCUSDT", "ETHUSDT", "FETUSDT", "FILUSDT",
-#    "GMTUSDT", "GRTUSDT", "GTCUSDT", "HOTUSDT",
-    "HBARUSDT", "ICPUSDT", 
-#     "ICXUSDT", "IMXUSDT", "JASMYUSDT", "JTOUSDT",
-#    "JUPUSDT", "KAVAUSDT", "KNCUSDT", "LINKUSDT", "LPTUSDT", "LQTYUSDT", "LTCUSDT", "MASKUSDT", "MTLUSDT",
-    "NEARUSDT", "OPUSDT"
-#    "NEOUSDT", "OGNUSDT", "ONEUSDT", "OPUSDT", "PEOPLEUSDT", "RLCUSDT", "RSRUSDT", "RUNEUSDT",
-#    "SANDUSDT", "SFPUSDT", "SKLUSDT", "SNXUSDT", "SOLUSDT",
-#    "STORJUSDT", 
-    "SUIUSDT", 
-#    "SUSHIUSDT", "SXPUSDT", "THETAUSDT", "TIAUSDT", "TONUSDT", "TRBUSDT", "TRXUSDT",
-#    "UNIUSDT", "VETUSDT", "WOOUSDT", "XLMUSDT", "XMRUSDT",
-    "XRPUSDT", 
-#    "XTZUSDT", "ZENUSDT", "ZILUSDT", "ZRXUSDT"
+#    "1INCHUSDT", 
+#    "ADAUSDT", "ALGOUSDT", "ALICEUSDT", "ANKRUSDT", "APEUSDT", "APTUSDT", "ARUSDT", "ARPAUSDT", "ATOMUSDT", "AVAXUSDT", "AXSUSDT",
+#    "BANDUSDT", "BATUSDT", "BCHUSDT", "BELUSDT", "BNBUSDT", "BONKUSDT", "BTCUSDT",
+#    "CELOUSDT", "CHZUSDT", "COMPUSDT", "COTIUSDT", "CYBERUSDT",
+#    "DASHUSDT", "DOGEUSDT", "DOTUSDT", "DYDXUSDT",
+#    "EGLDUSDT", "ENAUSDT", "ENJUSDT", "ENSUSDT", "ETCUSDT", "ETHUSDT", 
+#    "FILUSDT", "FLMUSDT",
+#    "GALAUSDT", "GMTUSDT", "GRTUSDT", "GTCUSDT",
+#    "HBARUSDT", 
+#    "ICPUSDT", "ICXUSDT", "IMXUSDT", "IOTXUSDT",
+#    "JASMYUSDT", "JTOUSDT", "JUPUSDT",
+#    "KAVAUSDT", "KDAUSDT", "KNCUSDT", "KSMUSDT",
+#    "LDOUSDT", "LINKUSDT", "LPTUSDT", "LQTYUSDT", "LRCUSDT", "LTCUSDT",
+#    "MASKUSDT", "MTLUSDT",
+#    "NEARUSDT", "NEOUSDT", "NKNUSDT",
+#    "OGNUSDT", "ONDOUSDT", "ONEUSDT", "OPUSDT",
+#    "PENDLEUSDT", "PEOPLEUSDT", "PEPEUSDT",
+#    "RLCUSDT", "RSRUSDT", "RUNEUSDT",
+#    "SANDUSDT", "SEIUSDT", "SFPUSDT", "SKLUSDT", "SNXUSDT", "SOLUSDT", "STORJUSDT", "SUIUSDT", "SUSHIUSDT", "SXPUSDT",
+#    "THETAUSDT", "TIAUSDT", "TONUSDT", "TRBUSDT", "TRXUSDT",
+#    "UNIUSDT",
+#    "VETUSDT",
+#    "WOOUSDT",
+#    "XLMUSDT", "XMRUSDT", "XRPUSDT", "XTZUSDT",
+#    "ZECUSDT", "ZENUSDT", "ZILUSDT", "ZRXUSDT"
+
+#Lista dos ativos do Bruno Aguiar na MEXC com taxa zero:
+    "BCHUSDT", "BNBUSDT", "CHZUSDT", "DOGEUSDT", "ENAUSDT", "ETHUSDT",
+    "JASMYUSDT", "SOLUSDT", "UNIUSDT", "XMRUSDT", "XRPUSDT"
 ]
 
 LOG_FILE = os.getenv("LOG_FILE", "scanner_runtime.log")
