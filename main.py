@@ -486,18 +486,15 @@ def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
 def main_loop():
     if not SCHEDULER.running:
         SCHEDULER.start()
+        LOGGER.info("Scheduler (web) iniciado.")
 
     if IS_RAILWAY:
         LOGGER.info("Ambiente Railway detectado – proteções ativadas.")
-
 
     send_telegram_or_fail("🤖 Scanner iniciado com sucesso (web).")
     send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log web) iniciado em {now_sp_str()} — Binance Futures (15m).")
     LOGGER.info("Iniciado scanner (log web) com lista fixa de símbolos.")
     LOGGER.info("Bot ativo (log web) - heartbeat")
-
-    SCHEDULER.start()
-    LOGGER.info("Scheduler (web) iniciado.")
 
     while not SHUTDOWN:
         LOGGER.info(
