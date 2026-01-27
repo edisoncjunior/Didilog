@@ -43,6 +43,8 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 POLL_SECONDS = int(os.getenv("POLL_SECONDS") or 60)
 KLINES_LIMIT = int(os.getenv("KLINES_LIMIT") or 200)
 
+STARTUP_GRACE_SECONDS = 30
+STARTED_AT = time.time()
 
 BOLLINGER_PERIOD = 8
 BOLLINGER_STD = 2
@@ -51,6 +53,10 @@ ADX_PERIOD = 8
 BOLLINGER_WIDTH_MIN_PCT = float(os.getenv("BOLLINGER_WIDTH_MIN_PCT") or 0.015)  # 1.5%
 ADX_MIN = float(os.getenv("ADX_MIN") or 15)
 ADX_ACCEL_THRESHOLD = float(os.getenv("ADX_ACCEL_THRESHOLD") or 0.05)  # relative accel
+
+
+IS_RAILWAY = bool(os.getenv("RAILWAY_ENVIRONMENT"))
+LOG_FILE = os.getenv("LOG_FILE", "scanner_runtime.log")
 
 BINANCE_FAPI = "https://fapi.binance.com"   # futures api (perpetual)
 
@@ -88,8 +94,6 @@ FIXED_SYMBOLS = [
     "BCHUSDT", "BNBUSDT", "CHZUSDT", "DOGEUSDT", "ENAUSDT", "ETHUSDT",
     "JASMYUSDT", "SOLUSDT", "UNIUSDT", "XMRUSDT", "XRPUSDT"
 ]
-
-LOG_FILE = os.getenv("LOG_FILE", "scanner_runtime.log")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -136,6 +140,7 @@ from apscheduler.triggers.cron import CronTrigger
 tz = pytz.timezone("America/Sao_Paulo")
 
 SCHEDULER = BackgroundScheduler(timezone=tz)
+SCHEDULER.daemonic = False
 
 SCHEDULER.add_job(
     enviar_log_diario,
@@ -351,64 +356,31 @@ def analyze_symbol(symbol):
 SHUTDOWN = False
 def handle_sigint(sig, frame):
     global SHUTDOWN
+    uptime = time.time() - STARTED_AT
+
+    # Proteção contra shutdown precoce do Railway
+    if uptime < STARTUP_GRACE_SECONDS:
+        LOGGER.warning(
+            "SIGTERM ignorado durante grace period (uptime=%.1fs)",
+            uptime
+        )
+        return
     SHUTDOWN = True
-    send_telegram(f"🤖 Scanner (MEXC-TXZERO log web) interrompido pelo usuário em {now_sp_str()}.")
-    LOGGER.info("Interrupção (web) solicitada. Encerrando...")
+    send_telegram(f"🤖 Scanner (MEXC-TXZERO log web) interrompido pelo sistema (SIGTERM) em {now_sp_str()}.")
+    LOGGER.info("Interrupção (web) real detectada. Encerrando scanner...")
 
 signal.signal(signal.SIGINT, handle_sigint)
 signal.signal(signal.SIGTERM, handle_sigint)
+
+def keep_alive_guard():
+    while True:
+        time.sleep(60)
 
 def send_telegram_or_fail(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"}
     r = requests.post(url, data=payload, timeout=10)
     r.raise_for_status()
-
-def main_loop():
-    send_telegram_or_fail("🤖 Scanner iniciado com sucesso (web).")
-    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log web) iniciado em {now_sp_str()} — Binance Futures (15m).")
-    LOGGER.info("Iniciado scanner (log web) com lista fixa de símbolos.")
-    LOGGER.info("Bot ativo (log web) - heartbeat")
-
-    SCHEDULER.start()
-    LOGGER.info("Scheduler (web) iniciado.")
-
-    while not SHUTDOWN:
-        try:
-            symbols = FIXED_SYMBOLS
-            LOGGER.info("Verificando (web) %d símbolos fixos: %s", len(symbols), ", ".join(symbols))
-            LOGGER.info("Novo ciclo (web) iniciado (%s símbolos)", len(FIXED_SYMBOLS))
-            alerts = []
-            for sym in symbols:
-                try:
-                    res = analyze_symbol(sym)
-                    if res:
-                        alerts.append(res)
-                        msg = build_alert_message(res)
-
-                        # 1️⃣ tenta gravar log (NUNCA pode quebrar o fluxo)
-                        try:
-                            log_signal_to_file(res)
-                        except Exception as e:
-                            LOGGER.exception("Falha (web) ao registrar log (ignorado): %s", e)
-
-                        # 2️⃣ envia Telegram SEMPRE
-                        send_telegram(msg)
-                        LOGGER.info(msg)
-                        LOGGER.info("Alerta (web) enviado: %s %s @ %.8f", res["symbol"], res["side"], res["price"])
-                except Exception as e:
-                    LOGGER.debug("Erro (web) analisando %s: %s", sym, e)
-            if not alerts:
-                LOGGER.info("Nenhum sinal encontrado neste ciclo (web).")
-        except Exception as e:
-            LOGGER.exception("Erro (web) no loop principal: %s", e)
-        # sleep
-        for _ in range(int(max(1, POLL_SECONDS))):
-            if SHUTDOWN:
-                break
-            time.sleep(1)
-    LOGGER.info("Scanner (web) finalizado.")
-    LOGGER.info("Ciclo (web) finalizado")
 
 def build_alert_message(res):
     sym = res["symbol"]
@@ -509,6 +481,72 @@ def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
             LOGGER.info("Log (web) gravado com sucesso: %s", log_file)
     except Exception as e:
         LOGGER.exception("Erro (web) ao gravar log em arquivo (%s): %s", log_file, e)
+
+
+def main_loop():
+    if not SCHEDULER.running:
+        SCHEDULER.start()
+
+    if IS_RAILWAY:
+        LOGGER.info("Ambiente Railway detectado – proteções ativadas.")
+
+
+    send_telegram_or_fail("🤖 Scanner iniciado com sucesso (web).")
+    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log web) iniciado em {now_sp_str()} — Binance Futures (15m).")
+    LOGGER.info("Iniciado scanner (log web) com lista fixa de símbolos.")
+    LOGGER.info("Bot ativo (log web) - heartbeat")
+
+    SCHEDULER.start()
+    LOGGER.info("Scheduler (web) iniciado.")
+
+    while not SHUTDOWN:
+        LOGGER.info(
+            "Heartbeat ativo | uptime=%.1fs | memória OK",
+            time.time() - STARTED_AT
+        )
+        sys.stdout.flush()
+
+        try:
+            symbols = FIXED_SYMBOLS
+            LOGGER.info("Verificando (web) %d símbolos fixos: %s", len(symbols), ", ".join(symbols))
+            LOGGER.info("Novo ciclo (web) iniciado (%s símbolos)", len(FIXED_SYMBOLS))
+            alerts = []
+            for sym in symbols:
+                try:
+                    res = analyze_symbol(sym)
+                    if res:
+                        alerts.append(res)
+                        msg = build_alert_message(res)
+
+                        # 1️⃣ tenta gravar log (NUNCA pode quebrar o fluxo)
+                        try:
+                            log_signal_to_file(res)
+                        except Exception as e:
+                            LOGGER.exception("Falha (web) ao registrar log (ignorado): %s", e)
+
+                        # 2️⃣ envia Telegram SEMPRE
+                        send_telegram(msg)
+                        LOGGER.info(msg)
+                        LOGGER.info("Alerta (web) enviado: %s %s @ %.8f", res["symbol"], res["side"], res["price"])
+                except Exception as e:
+                    LOGGER.debug("Erro (web) analisando %s: %s", sym, e)
+            if not alerts:
+                LOGGER.info("Nenhum sinal encontrado neste ciclo (web).")
+        except Exception as e:
+            LOGGER.exception("Erro (web) no loop principal: %s", e)
+        # sleep
+        for _ in range(int(max(1, POLL_SECONDS))):
+            if SHUTDOWN:
+                break
+            time.sleep(1)
+    LOGGER.info("Scanner (web) finalizado.")
+    LOGGER.info("Ciclo (web) finalizado")
+
+    threading.Thread(
+        target=keep_alive_guard,
+        daemon=False
+    ).start()
+
 
 
 
