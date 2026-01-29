@@ -3,8 +3,6 @@
 # coloquei pra rodar local 19h terça 27/01 (funcionou mas não enviou o log a meia noite)
 # coloquei pra rodar web 08h15 dia 28/01  (aguardando resultado) 
 
-# antes de fazer os testes -> desligar a versão web ou mudar o grupo?
-
 #!/usr/bin/env python3
 """
 Binance Futures 15m scanner -> Telegram alerts
@@ -258,15 +256,21 @@ def analyze_symbol(symbol):
     # Filters/indicators
     bb_open, last_width, baseline = bollinger_open(df)
     if not bb_open:
+        LOGGER.debug(f"{symbol} rejeitado: BB fechada " f"(width={last_width:.4f}, baseline={baseline:.4f})") #teste
         return None
+
 
     adx_ok, adx_value = adx_accelerating(df)
     if not adx_ok:
+        LOGGER.debug(f"{symbol} rejeitado: ADX fraco ou sem aceleração " f"(ADX={adx_value})")
         return None
+
 
     cross = triple_sma_cross(df)
     if not cross:
+        LOGGER.debug(f"{symbol} rejeitado: sem cruzamento SMA(3,8,20)")
         return None
+
 
     entry_price, tps, atr_val = compute_targets(df, cross)
     # Compose result
@@ -399,6 +403,9 @@ def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
         LOGGER.exception("Erro ao gravar log em arquivo (web) (%s): %s", log_file, e)
 
 def main_loop():
+    LOGGER.info("Aguardando estabilização inicial (warm-up)...") #teste
+    time.sleep(30)  #teste
+
     send_telegram_or_fail("🤖 Scanner iniciado com sucesso (web).")
     send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO web) iniciado em {now_sp_str()} — Binance Futures (15m).")
     LOGGER.info("Iniciado scanner com lista fixa de símbolos.(web)")
@@ -406,9 +413,17 @@ def main_loop():
     tz = pytz.timezone("America/Sao_Paulo")
     last_summary_date = None
 
+    first_cycle = True #teste
+
     while not SHUTDOWN:
         now = datetime.now(tz)
         today = now.date()
+
+        if first_cycle: #teste
+            LOGGER.info("Ignorando primeiro ciclo após restart (warm-up lógico).") #teste
+            first_cycle = False #teste
+            time.sleep(POLL_SECONDS) #teste
+
 
         # 🔔 Envia resumo uma única vez quando vira o dia
         if last_summary_date != today:
