@@ -467,7 +467,7 @@ def main_loop():
         for _ in range(int(max(1, POLL_SECONDS))):
             if SHUTDOWN:
                 break
-            time.sleep(10)
+            time.sleep(1)
     LOGGER.info("Scanner finalizado (web).")
     LOGGER.info("Ciclo finalizado (web).")
 
