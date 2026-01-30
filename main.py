@@ -1,9 +1,7 @@
-﻿# MEXC-TXZERO log+web - Didi funcionando (local e web) = 
-# coloquei pra rodar local 22h sexta 23/01 e funcionou
-# coloquei pra rodar web 16h dia 27/01  (aguardando resultado) 
-
-#proximos testes = 1) colocar log para enviar as 9 e 21h # testando!
-# antes de fazer os testes -> desligar a versão web ou mudar o grupo?
+﻿# MEXC-TXZERO local com log - Didi (local)
+# Dia 24horas com envio de log a meia noite
+# coloquei pra rodar local 19h terça 27/01 (funcionou mas não enviou o log a meia noite)
+# coloquei pra rodar web 08h15 dia 28/01  (aguardando resultado) 
 
 #!/usr/bin/env python3
 """
@@ -25,10 +23,10 @@ import sys
 import time
 import signal
 import logging
-from datetime import datetime, timezone, timedelta
 import requests
 import numpy as np
 import pandas as pd
+from datetime import datetime
 from dotenv import load_dotenv
 import pytz
 
@@ -40,7 +38,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 # BINANCE_API_KEY = os.getenv("BINANCE_API_KEY") or ""
 # BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET") or ""
 
-POLL_SECONDS = int(os.getenv("POLL_SECONDS") or 60)
+POLL_SECONDS = int(os.getenv("POLL_SECONDS") or 120)
 KLINES_LIMIT = int(os.getenv("KLINES_LIMIT") or 200)
 
 
@@ -77,53 +75,15 @@ logging.basicConfig(
 LOGGER = logging.getLogger("scanner")
 
 if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-    LOGGER.error("TELEGRAM_TOKEN and TELEGRAM_CHAT_ID must be set in .env")
+    LOGGER.error("TELEGRAM_TOKEN and TELEGRAM_CHAT_ID must be set in .env (web)")
     sys.exit(1)
 
-
-# --- Função auxiliar: dia operacional
-
-def get_operational_date(now=None):
+def get_today_str(now=None):
     tz = pytz.timezone("America/Sao_Paulo")
-    if now is None:
-        now = datetime.now(tz)
-
-    # Se horário >= 21h, considera próximo dia
-    if now.hour >= 21:
-        operational_date = (now + timedelta(days=1)).date()
-    else:
-        operational_date = now.date()
-
-    return operational_date.strftime("%Y-%m-%d")
-
-def enviar_log_diario():
-    try:
-        send_daily_summary()
-        LOGGER.info("Resumo diário enviado com sucesso (scheduler).")
-    except Exception:
-        LOGGER.exception("Erro ao enviar resumo diário (scheduler).")
-
-
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
+    now = now or datetime.now(tz)
+    return now.strftime("%Y-%m-%d")
 
 tz = pytz.timezone("America/Sao_Paulo")
-
-SCHEDULER = BackgroundScheduler(timezone=tz)
-
-SCHEDULER.add_job(
-    enviar_log_diario,
-    CronTrigger(hour=9, minute=0, timezone=tz),
-    id="log_manha",
-    replace_existing=True
-)
-
-SCHEDULER.add_job(
-    enviar_log_diario,
-    CronTrigger(hour=21, minute=0, timezone=tz),
-    id="log_noite",
-    replace_existing=True
-)
 
 # --- Utilities
 
@@ -139,7 +99,7 @@ def send_telegram(text):
         r = requests.post(url, data=payload, timeout=10)
         r.raise_for_status()
     except Exception as e:
-        LOGGER.exception("Erro enviando Telegram: %s", e)
+        LOGGER.exception("Erro enviando Telegram (web): %s", e)
 
 def fetch_klines(symbol, interval="15m", limit=KLINES_LIMIT):
     url = BINANCE_FAPI + "/fapi/v1/klines"
@@ -287,7 +247,7 @@ def analyze_symbol(symbol):
         df = fetch_klines(symbol, interval="15m", limit=KLINES_LIMIT)
         df = df.iloc[:-1] # remove candles ainda abertos
     except Exception as e:
-        LOGGER.debug("Erro ao buscar klines %s: %s", symbol, e)
+        LOGGER.debug("Erro ao buscar klines (web) %s: %s", symbol, e)
         return None
 
     if df is None or df.empty:
@@ -296,15 +256,21 @@ def analyze_symbol(symbol):
     # Filters/indicators
     bb_open, last_width, baseline = bollinger_open(df)
     if not bb_open:
+        LOGGER.debug(f"{symbol} rejeitado: BB fechada " f"(width={last_width:.4f}, baseline={baseline:.4f})") #teste
         return None
+
 
     adx_ok, adx_value = adx_accelerating(df)
     if not adx_ok:
+        LOGGER.debug(f"{symbol} rejeitado: ADX fraco ou sem aceleração " f"(ADX={adx_value})")
         return None
+
 
     cross = triple_sma_cross(df)
     if not cross:
+        LOGGER.debug(f"{symbol} rejeitado: sem cruzamento SMA(3,8,20)")
         return None
+
 
     entry_price, tps, atr_val = compute_targets(df, cross)
     # Compose result
@@ -326,8 +292,8 @@ SHUTDOWN = False
 def handle_sigint(sig, frame):
     global SHUTDOWN
     SHUTDOWN = True
-    send_telegram(f"🤖 Scanner (MEXC-TXZERO log web) interrompido pelo usuário em {now_sp_str()}.")
-    LOGGER.info("Interrupção solicitada. Encerrando...")
+    send_telegram(f"🤖 Scanner (MEXC-TXZERO web) interrompido pelo usuário em {now_sp_str()}.")
+    LOGGER.info("Interrupção solicitada (web). Encerrando...")
 
 signal.signal(signal.SIGINT, handle_sigint)
 signal.signal(signal.SIGTERM, handle_sigint)
@@ -337,52 +303,6 @@ def send_telegram_or_fail(text):
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"}
     r = requests.post(url, data=payload, timeout=10)
     r.raise_for_status()
-
-def main_loop():
-    send_telegram_or_fail("🤖 Scanner iniciado com sucesso (Railway).")
-    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log web) iniciado em {now_sp_str()} — Binance Futures (15m).")
-    LOGGER.info("Iniciado scanner com lista fixa de símbolos.(log+")
-    LOGGER.info("Bot ativo - heartbeat")
-
-    SCHEDULER.start()
-    LOGGER.info("Scheduler iniciado.")
-
-    while not SHUTDOWN:
-        try:
-            symbols = FIXED_SYMBOLS
-            LOGGER.info("Verificando %d símbolos fixos: %s", len(symbols), ", ".join(symbols))
-            LOGGER.info("Novo ciclo iniciado (%s símbolos)", len(FIXED_SYMBOLS))
-            alerts = []
-            for sym in symbols:
-                try:
-                    res = analyze_symbol(sym)
-                    if res:
-                        alerts.append(res)
-                        msg = build_alert_message(res)
-
-                        # 1️⃣ tenta gravar log (NUNCA pode quebrar o fluxo)
-                        try:
-                            log_signal_to_file(res)
-                        except Exception as e:
-                            LOGGER.exception("Falha ao registrar log (ignorado): %s", e)
-
-                        # 2️⃣ envia Telegram SEMPRE
-                        send_telegram(msg)
-                        LOGGER.info(msg)
-                        LOGGER.info("Alerta enviado: %s %s @ %.8f", res["symbol"], res["side"], res["price"])
-                except Exception as e:
-                    LOGGER.debug("Erro analisando %s: %s", sym, e)
-            if not alerts:
-                LOGGER.info("Nenhum sinal encontrado neste ciclo.")
-        except Exception as e:
-            LOGGER.exception("Erro no loop principal: %s", e)
-        # sleep
-        for _ in range(int(max(1, POLL_SECONDS))):
-            if SHUTDOWN:
-                break
-            time.sleep(1)
-    LOGGER.info("Scanner finalizado.")
-    LOGGER.info("Ciclo finalizado")
 
 def build_alert_message(res):
     sym = res["symbol"]
@@ -413,15 +333,13 @@ def build_alert_message(res):
     )
     return msg
 
-def get_daily_log_filename(operational_date):
-    return f"telegram_signals_{operational_date}.tsv"
+def get_daily_log_filename(date_str):
+    return f"telegram_signals_{date_str}.tsv"
 
-def send_daily_summary():
-    operational_date = get_operational_date()
-    log_file = get_daily_log_filename(operational_date)
-
+def send_daily_summary(date_str):
     if not os.path.isfile(log_file):
         send_telegram("📊 Resumo diário:\nNenhum sinal registrado no período. (log web)")
+        send_telegram(f"📊 <b>RESUMO DIÁRIO</b>\n" f"Data: {date_str}\n\n" f"Nenhum sinal registrado.")
         return
 
     df = pd.read_csv(log_file, sep="\t")
@@ -433,8 +351,8 @@ def send_daily_summary():
     symbols = ", ".join(sorted(df["symbol"].unique()))
 
     msg = (
-        f"📊 <b>RESUMO DIÁRIO – MEXC-TXZERO log web</b>\n"
-        f"Dia operacional: {operational_date}\n\n"
+        f"📊 <b>RESUMO DIÁRIO – MEXC-TXZERO web</b>\n"
+        f"Data: {date_str}\n\n"
         f"Total de sinais: <b>{total}</b>\n"
         f"LONG: {longs}\n"
         f"SHORT: {shorts}\n\n"
@@ -442,7 +360,7 @@ def send_daily_summary():
     )
 
     send_telegram(msg)
-    LOGGER.info("Resumo diário enviado.")
+    LOGGER.info("Resumo diário enviado. (web)", date_str)
 
 def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
     tz = pytz.timezone("America/Sao_Paulo")
@@ -455,7 +373,7 @@ def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
 
     row = (
         f"{res['symbol']}\t"
-        f"{get_operational_date(now)}\t"
+        f"{get_today_str(now)}\t"
         f"{now.strftime('%H:%M:%S')}\t"
         f"{timeframe}\t"
         f"{exchange}\t"
@@ -472,7 +390,7 @@ def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
         f"SMA(3,8,20)+ADX+BB\n"
     )
 
-    log_file = get_daily_log_filename(get_operational_date())
+    log_file = get_daily_log_filename(get_today_str(now))
     file_exists = os.path.isfile(log_file)
 
     try:
@@ -480,10 +398,78 @@ def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
             if not file_exists:
                 f.write(header)
             f.write(row)
-            LOGGER.info("Log gravado com sucesso: %s", log_file)
+            LOGGER.info("Log gravado com sucesso (web): %s", log_file)
     except Exception as e:
-        LOGGER.exception("Erro ao gravar log em arquivo (%s): %s", log_file, e)
+        LOGGER.exception("Erro ao gravar log em arquivo (web) (%s): %s", log_file, e)
 
+def main_loop():
+    LOGGER.info("Aguardando estabilização inicial (warm-up)...") #teste
+    time.sleep(30)  #teste
+
+    send_telegram_or_fail("🤖 Scanner iniciado com sucesso (web).")
+    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO web) iniciado em {now_sp_str()} — Binance Futures (15m).")
+    LOGGER.info("Iniciado scanner com lista fixa de símbolos.(web)")
+
+    tz = pytz.timezone("America/Sao_Paulo")
+    last_summary_date = None
+
+    first_cycle = True #teste
+
+    while not SHUTDOWN:
+        now = datetime.now(tz)
+        today = now.date()
+
+        if first_cycle: #teste
+            LOGGER.info("Ignorando primeiro ciclo após restart (warm-up lógico).") #teste
+            first_cycle = False #teste
+            time.sleep(POLL_SECONDS) #teste
+
+
+        # 🔔 Envia resumo uma única vez quando vira o dia
+        if last_summary_date != today:
+            if last_summary_date is not None:
+                try:
+                    send_daily_summary(last_summary_date.strftime("%Y-%m-%d"))
+                except Exception:
+                    LOGGER.exception("Erro ao enviar resumo diário (web)")
+
+            last_summary_date = today
+
+        try:
+            symbols = FIXED_SYMBOLS
+            LOGGER.info("Verificando %d símbolos fixos (web): %s", len(symbols), ", ".join(symbols))
+            LOGGER.info("Novo ciclo iniciado (web) (%s símbolos)", len(FIXED_SYMBOLS))
+            alerts = []
+            for sym in symbols:
+                try:
+                    res = analyze_symbol(sym)
+                    if res:
+                        alerts.append(res)
+                        msg = build_alert_message(res)
+
+                        # 1️⃣ tenta gravar log (NUNCA pode quebrar o fluxo)
+                        try:
+                            log_signal_to_file(res)
+                        except Exception as e:
+                            LOGGER.exception("Falha ao registrar log (ignorado) (web): %s", e)
+
+                        # 2️⃣ envia Telegram SEMPRE
+                        send_telegram(msg)
+                        LOGGER.info(msg)
+                        LOGGER.info("Alerta enviado (web): %s %s @ %.8f", res["symbol"], res["side"], res["price"])
+                except Exception as e:
+                    LOGGER.debug("Erro analisando (web) %s: %s", sym, e)
+            if not alerts:
+                LOGGER.info("Nenhum sinal encontrado neste ciclo. (web)")
+        except Exception as e:
+            LOGGER.exception("Erro no loop principal (web): %s", e)
+        # sleep
+        for _ in range(int(max(1, POLL_SECONDS))):
+            if SHUTDOWN:
+                break
+            time.sleep(1)
+    LOGGER.info("Scanner finalizado (web).")
+    LOGGER.info("Ciclo finalizado (web).")
 
 
 if __name__ == "__main__":
