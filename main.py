@@ -1,4 +1,4 @@
-﻿em teste na web hoje 09h30 30/01
+﻿# em teste na web hoje 09h30 30/01
 
 # MEXC-TXZERO (local) - Didi funcionando (local e web) = 
 # coloquei pra rodar local 8h27 sexta 24/01 e funcionou
