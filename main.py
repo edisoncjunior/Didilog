@@ -127,9 +127,9 @@ def get_operational_date(now=None):
 def enviar_log_diario():
     try:
         send_daily_summary()
-        LOGGER.info("Resumo diário enviado com sucesso (local).")
+        LOGGER.info("Resumo diário enviado com sucesso (web3).")
     except Exception:
-        LOGGER.exception("Erro ao enviar resumo diário (local).")
+        LOGGER.exception("Erro ao enviar resumo diário (web3).")
 
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -167,7 +167,7 @@ def send_telegram(text):
         r = requests.post(url, data=payload, timeout=10)
         r.raise_for_status()
     except Exception as e:
-        LOGGER.exception("Erro (local) enviando Telegram: %s", e)
+        LOGGER.exception("Erro (web3) enviando Telegram: %s", e)
 
 def fetch_klines(symbol, interval="15m", limit=KLINES_LIMIT):
     url = BINANCE_FAPI + "/fapi/v1/klines"
@@ -315,7 +315,7 @@ def analyze_symbol(symbol):
         df = fetch_klines(symbol, interval="15m", limit=KLINES_LIMIT)
         df = df.iloc[:-1] # remove candles ainda abertos
     except Exception as e:
-        LOGGER.debug("Erro (local) ao buscar klines %s: %s", symbol, e)
+        LOGGER.debug("Erro (web3) ao buscar klines %s: %s", symbol, e)
         return None
 
     if df is None or df.empty:
@@ -354,8 +354,8 @@ SHUTDOWN = False
 def handle_sigint(sig, frame):
     global SHUTDOWN
     SHUTDOWN = True
-    send_telegram(f"🤖 Scanner (MEXC-TXZERO log local) interrompido pelo usuário em {now_sp_str()}.")
-    LOGGER.info("Interrupção (local) solicitada. Encerrando...")
+    send_telegram(f"🤖 Scanner (MEXC-TXZERO log web3) interrompido pelo usuário em {now_sp_str()}.")
+    LOGGER.info("Interrupção (web3) solicitada. Encerrando...")
 
 signal.signal(signal.SIGINT, handle_sigint)
 signal.signal(signal.SIGTERM, handle_sigint)
@@ -367,19 +367,19 @@ def send_telegram_or_fail(text):
     r.raise_for_status()
 
 def main_loop():
-    send_telegram_or_fail("🤖 Scanner iniciado com sucesso (local).")
-    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log local) iniciado em {now_sp_str()} — Binance Futures (15m).")
-    LOGGER.info("Iniciado scanner (log local) com lista fixa de símbolos.")
-    LOGGER.info("Bot ativo (log local) - heartbeat")
+    send_telegram_or_fail("🤖 Scanner iniciado com sucesso (web3).")
+    send_telegram(f"🤖 Scanner 15min (MEXC-TXZERO log web3) iniciado em {now_sp_str()} — Binance Futures (15m).")
+    LOGGER.info("Iniciado scanner (log web3) com lista fixa de símbolos.")
+    LOGGER.info("Bot ativo (log web3) - heartbeat")
 
     SCHEDULER.start()
-    LOGGER.info("Scheduler (local) iniciado.")
+    LOGGER.info("Scheduler (web3) iniciado.")
 
     while not SHUTDOWN:
         try:
             symbols = FIXED_SYMBOLS
-            LOGGER.info("Verificando (local) %d símbolos fixos: %s", len(symbols), ", ".join(symbols))
-            LOGGER.info("Novo ciclo (local) iniciado (%s símbolos)", len(FIXED_SYMBOLS))
+            LOGGER.info("Verificando (web3) %d símbolos fixos: %s", len(symbols), ", ".join(symbols))
+            LOGGER.info("Novo ciclo (web3) iniciado (%s símbolos)", len(FIXED_SYMBOLS))
             alerts = []
             for sym in symbols:
                 try:
@@ -392,25 +392,25 @@ def main_loop():
                         try:
                             log_signal_to_file(res)
                         except Exception as e:
-                            LOGGER.exception("Falha (local) ao registrar log (ignorado): %s", e)
+                            LOGGER.exception("Falha (web3) ao registrar log (ignorado): %s", e)
 
                         # 2️⃣ envia Telegram SEMPRE
                         send_telegram(msg)
                         LOGGER.info(msg)
-                        LOGGER.info("Alerta (local) enviado: %s %s @ %.8f", res["symbol"], res["side"], res["price"])
+                        LOGGER.info("Alerta (web3) enviado: %s %s @ %.8f", res["symbol"], res["side"], res["price"])
                 except Exception as e:
-                    LOGGER.debug("Erro (local) analisando %s: %s", sym, e)
+                    LOGGER.debug("Erro (web3) analisando %s: %s", sym, e)
             if not alerts:
-                LOGGER.info("Nenhum sinal encontrado neste ciclo (local).")
+                LOGGER.info("Nenhum sinal encontrado neste ciclo (web3).")
         except Exception as e:
-            LOGGER.exception("Erro (local) no loop principal: %s", e)
+            LOGGER.exception("Erro (web3) no loop principal: %s", e)
         # sleep
         for _ in range(int(max(1, POLL_SECONDS))):
             if SHUTDOWN:
                 break
             time.sleep(1)
-    LOGGER.info("Scanner (local) finalizado.")
-    LOGGER.info("Ciclo (local) finalizado")
+    LOGGER.info("Scanner (web3) finalizado.")
+    LOGGER.info("Ciclo (web3) finalizado")
 
 def build_alert_message(res):
     sym = res["symbol"]
@@ -425,7 +425,7 @@ def build_alert_message(res):
     # Compose TPs text
     tps_text = "\n".join([f"TP{i+1}: {tp:.8f}" for i,tp in enumerate(tps)])
     msg = (
-        f"🚨 <b>ALERTA 15min (MEXC-TXZERO log local)</b>\n"
+        f"🚨 <b>ALERTA 15min (MEXC-TXZERO log web3)</b>\n"
         f"Exchange: Binance Futures\n"
         f"Par: <b>{sym}</b>\n"
         f"Horário SP: {now}\n"
@@ -449,7 +449,7 @@ def send_daily_summary():
     log_file = get_daily_log_filename(operational_date)
 
     if not os.path.isfile(log_file):
-        send_telegram("📊 Resumo diário:\nNenhum sinal registrado no período. (log local)")
+        send_telegram("📊 Resumo diário:\nNenhum sinal registrado no período. (log web3)")
         return
 
     df = pd.read_csv(log_file, sep="\t")
@@ -461,7 +461,7 @@ def send_daily_summary():
     symbols = ", ".join(sorted(df["symbol"].unique()))
 
     msg = (
-        f"📊 <b>RESUMO DIÁRIO – MEXC-TXZERO log local</b>\n"
+        f"📊 <b>RESUMO DIÁRIO – MEXC-TXZERO log web3 </b>\n"
         f"Dia operacional: {operational_date}\n\n"
         f"Total de sinais: <b>{total}</b>\n"
         f"LONG: {longs}\n"
@@ -470,7 +470,7 @@ def send_daily_summary():
     )
 
     send_telegram(msg)
-    LOGGER.info("Resumo diário (local) enviado.")
+    LOGGER.info("Resumo diário (web3) enviado.")
 
 def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
     tz = pytz.timezone("America/Sao_Paulo")
@@ -508,9 +508,9 @@ def log_signal_to_file(res, timeframe="15m", exchange="Binance Futures"):
             if not file_exists:
                 f.write(header)
             f.write(row)
-            LOGGER.info("Log (local) gravado com sucesso: %s", log_file)
+            LOGGER.info("Log (web3) gravado com sucesso: %s", log_file)
     except Exception as e:
-        LOGGER.exception("Erro (local) ao gravar log em arquivo (%s): %s", log_file, e)
+        LOGGER.exception("Erro (web3) ao gravar log em arquivo (%s): %s", log_file, e)
 
 
 
